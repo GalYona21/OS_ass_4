@@ -252,7 +252,7 @@ create(char *path, short type, short major, short minor)
   if((ip = dirlookup(dp, name, 0)) != 0){
     iunlockput(dp);
     ilock(ip);
-    if(type == T_FILE && (ip->type == T_FILE || ip->type == T_DEVICE))
+    if((type == T_FILE && (ip->type == T_FILE || ip->type == T_DEVICE)) || type == T_SYMLINK)
       return ip;
     iunlockput(ip);
     return 0;
@@ -347,7 +347,33 @@ sys_open(void)
 
   iunlock(ip);
   end_op();
+    //// change
+    if ((ip->type == T_SYMLINK) && !(omode & O_NOFOLLOW)){
+        int count = 0;
+        while (ip->type == T_SYMLINK && count < 10) {
+            int len = 0;
+            readi(ip, 0, (uint64)&len, 0, sizeof(int));
 
+            if(len > MAXPATH)
+                panic("open: corrupted symlink inode");
+
+            readi(ip, 0, (uint64)path, sizeof(int), len + 1);
+            iunlockput(ip);
+            if((ip = namei(path)) == 0){
+                end_op(ROOTDEV);
+                return -1;
+            }
+            ilock(ip);
+            count++;
+        }
+        if (count >= 10) {
+            printf("We got a cycle!\n");
+            iunlockput(ip);
+            end_op(ROOTDEV);
+            return -1;
+        }
+    }
+    ////end
   return fd;
 }
 
