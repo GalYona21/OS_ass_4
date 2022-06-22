@@ -347,15 +347,12 @@ sys_symlink(void)
     if(argstr(0, target, MAXPATH) < 0 || argstr(1, path, MAXPATH) < 0){
         return -1;
     }
-    //printf(“creating a sym link. Target(%s). Path(%s)\n”, target, path);
-
     begin_op();
-    struct inode *ip = create(path, T_SYMLINK, 0, 0);
-    if(ip == 0){
+    struct inode *ip;
+    if((ip = create(path, T_SYMLINK, 0, 0)) == 0){
         end_op();
         return -1;
     }
-
     int len = strlen(target);
     writei(ip, 0, (uint64)&len, 0, sizeof(int));
     writei(ip, 0, (uint64)target, sizeof(int), len + 1);
