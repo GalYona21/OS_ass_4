@@ -424,7 +424,11 @@ bmap(struct inode *ip, uint bn) {
         if ((addr = a[pos]) == 0) {
             a[pos] = addr = balloc(ip->dev);
             log_write(bp);
+
         }
+        brelse(bp);
+        return addr;
+
 //// end
     }
     panic("bmap: out of range");
