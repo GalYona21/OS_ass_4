@@ -708,10 +708,9 @@ nameiparent(char *path, char *name)
 
 
 struct inode*
-getdreflink(struct inode* ip, int* dref)
-        {
+getdreflink(struct inode* ip, int* dref){
     struct inode* output = ip;
-    char buffer[256];
+    char buf[256];
     char name[DIRSIZ];
     while(output->type == T_SYMLINK){
         *dref = *dref - 1;
@@ -722,9 +721,10 @@ getdreflink(struct inode* ip, int* dref)
         if(output->type != T_SYMLINK){
             iunlock(output);
         }
-        readi(output,0, (uint64)buffer, 0, output->type);
+        else
+            readi(output,0, (uint64)buf, 0, output->type);
         iunlockput(output);
-        output = namex(buffer, 0, name);
+        output = namex(buf, 0, name);
         if(!output){
             return 0;
         }

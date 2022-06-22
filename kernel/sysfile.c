@@ -252,11 +252,8 @@ create(char *path, short type, short major, short minor)
   if((ip = dirlookup(dp, name, 0)) != 0){
     iunlockput(dp);
     ilock(ip);
-    if(type == T_FILE && (ip->type == T_FILE || ip->type == T_DEVICE))
+    if((type == T_FILE && (ip->type == T_FILE || ip->type == T_DEVICE)) || type == T_SYMLINK)
       return ip;
-    if(type == T_SYMLINK) {
-        return ip;
-    }
     iunlockput(ip);
     return 0;
   }
@@ -286,8 +283,6 @@ create(char *path, short type, short major, short minor)
   return ip;
 }
 
-////change
-
 uint64
 sys_readlink(void)
 {
@@ -295,14 +290,8 @@ sys_readlink(void)
 
     int bufsize;
     uint64 addr;
-    if (argstr(0, pathname, MAXPATH) < 0)
+    if (argstr(0, pathname, MAXPATH) < 0 || argint(2, (&bufsize)) < 0 || argaddr(1,&addr) < 0)
         return -1;
-    if(argint(2, (&bufsize)) < 0){
-        return -1;
-    }
-    if(argaddr(1,&addr) < 0){
-        return -1;
-    }
     struct inode *ip;
     begin_op();
     if ((ip = namei(pathname)) == 0)
@@ -311,13 +300,7 @@ sys_readlink(void)
         return -1;
     }
     ilock(ip);
-    if (ip->type != T_SYMLINK)
-    {
-        iunlock(ip);
-        end_op();
-        return -1;
-    }
-    if (ip->size > bufsize)
+    if (ip->type != T_SYMLINK || ip->size > bufsize)
     {
         iunlock(ip);
         end_op();
@@ -326,7 +309,6 @@ sys_readlink(void)
     char buffer[bufsize];
     int output = readi(ip, 0, (uint64)buffer, 0, bufsize);
     struct proc *p = myproc();
-
     if (copyout(p->pagetable, addr, buffer, bufsize) < 0)
     {
         iunlock(ip);
@@ -334,11 +316,9 @@ sys_readlink(void)
         return -1;
     }
     iunlock(ip);
-
     end_op();
     return output;
 }
-
 
 uint64
 sys_symlink(void)
@@ -375,12 +355,9 @@ sys_open(void)
 
   if((n = argstr(0, path, MAXPATH)) < 0 || argint(1, &omode) < 0)
     return -1;
-
   begin_op();
-
   if(omode & O_CREATE){
-    ip = create(path, T_FILE, 0, 0);
-    if(ip == 0){
+    if((ip = create(path, T_FILE, 0, 0)) == 0){
       end_op();
       return -1;
     }
@@ -396,12 +373,9 @@ sys_open(void)
       return -1;
     }
 
-    if (ip->type == T_SYMLINK && (omode != O_NOFOLLOW)){
-        if ((ip = getdreflink(ip, &maxref)) == 0)
-        {
-            end_op();
-            return -1;
-        }
+    if (ip->type == T_SYMLINK && (omode != O_NOFOLLOW) && (ip = getdreflink(ip, &maxref)) == 0){
+        end_op();
+        return -1;
     }
   }
 
@@ -465,7 +439,6 @@ sys_open(void)
 
   return fd;
 }
-////end change
 
 uint64
 sys_mkdir(void)
