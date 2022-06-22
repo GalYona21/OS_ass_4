@@ -21,10 +21,14 @@
 #include "buf.h"
 #include "file.h"
 
+
 #define min(a, b) ((a) < (b) ? (a) : (b))
 // there should be one superblock per disk device, but we run with
 // only one device
-struct superblock sb; 
+struct superblock sb;
+struct inode* getdreflink(struct inode* ip, int* dref);
+
+int ref_count = MAX_DEREFERENCE;
 
 // Read the super block.
 static void
@@ -312,6 +316,8 @@ ilock(struct inode *ip)
   }
 }
 
+
+
 // Unlock the given inode.
 void
 iunlock(struct inode *ip)
@@ -403,13 +409,10 @@ bmap(struct inode *ip, uint bn)
 
     bn -= NINDIRECT;
     if(bn < NDOUBLY_INDIRECT) {
-        // Load double indirect block, allocating if necessary.
         if ((addr = ip->addrs[NDIRECT + 1]) == 0)
             ip->addrs[NDIRECT + 1] = addr = balloc(ip->dev);
         bp = bread(ip->dev, addr);
         a = (uint *) bp->data;
-
-        // load 2nd layer block.
         uint double_index = bn / NINDIRECT;
         if ((addr = a[double_index]) == 0) {
             a[double_index] = addr = balloc(ip->dev);
@@ -417,7 +420,6 @@ bmap(struct inode *ip, uint bn)
         }
         brelse(bp);
 
-        // now find disk block.
         bp = bread(ip->dev, addr);
         a = (uint *) bp->data;
         uint pos = bn % NINDIRECT;
@@ -649,6 +651,8 @@ skipelem(char *path, char *name)
   return path;
 }
 
+
+
 // Look up and return the inode for a path name.
 // If parent != 0, return the inode for the parent and copy the final
 // path element into name, which must have room for DIRSIZ bytes.
@@ -665,6 +669,9 @@ namex(char *path, int nameiparent, char *name)
 
   while((path = skipelem(path, name)) != 0){
     ilock(ip);
+    if(!(ip=getdreflink(ip,&ref_count))){
+        return 0;
+    }
     if(ip->type != T_DIR){
       iunlockput(ip);
       return 0;
@@ -699,4 +706,54 @@ struct inode*
 nameiparent(char *path, char *name)
 {
   return namex(path, 1, name);
+}
+
+
+struct inode*
+getdreflink(struct inode* ip, int* dref)
+        {
+    struct inode* output = ip;
+    char buffer[256];
+    char name[DIRSIZ];
+    while(output->type == T_SYMLINK){
+        *dref = *dref - 1;
+        if(!(*dref)){
+            iunlockput(output);
+            return 0;
+        }
+        if(output->type != T_SYMLINK){
+            iunlock(output);
+        }
+        readi(output,0, (uint64)buffer, 0, output->type);
+        iunlockput(output);
+        output = namex(buffer, 0, name);
+        if(!output){
+            return 0;
+        }
+        ilock(output);
+    }
+    return output;
+}
+
+int
+readlink(const char* path, char* buffer, int bufsize){
+    char name[DIRSIZ];
+    int output;
+    struct inode* inodep = namex((char*)(path), 0, name);
+    if(!inodep){
+        return -1;
+    }
+
+    ilock(inodep);
+    if(inodep->type != T_SYMLINK){
+        iunlock(inodep);
+        output = -1;
+    }
+    else{
+        readi(inodep,0, (uint64)buffer, 0, bufsize);
+        output = 0;
+    }
+    iunlock(inodep);
+
+    return output;
 }

@@ -21,6 +21,7 @@ exec(char *path, char **argv)
   pagetable_t pagetable = 0, oldpagetable;
   struct proc *p = myproc();
 
+
   begin_op();
 
   if((ip = namei(path)) == 0){
@@ -29,6 +30,12 @@ exec(char *path, char **argv)
   }
   ilock(ip);
 
+  int maxref = MAX_DEREFERENCE;
+  struct inode* inode = getdreflink(ip,&maxref);
+  if(ip != inode){
+      iunlock(ip);
+      ip = inode;
+  }
   // Check ELF header
   if(readi(ip, 0, (uint64)&elf, 0, sizeof(elf)) != sizeof(elf))
     goto bad;
