@@ -185,8 +185,8 @@ void            virtio_disk_rw(struct buf *, int);
 void            virtio_disk_intr(void);
 
 ////our sys call
-uint64          sys_symlink(void);
-uint64          sys_readlink(void);
+//uint64          sys_symlink(void);
+//uint64          sys_readlink(void);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

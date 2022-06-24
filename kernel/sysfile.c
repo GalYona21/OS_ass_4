@@ -252,7 +252,7 @@ create(char *path, short type, short major, short minor)
   if((ip = dirlookup(dp, name, 0)) != 0){
     iunlockput(dp);
     ilock(ip);
-    if((type == T_FILE && (ip->type == T_FILE || ip->type == T_DEVICE)) || type == T_SYMLINK)
+    if(type == T_FILE && (ip->type == T_FILE || ip->type == T_DEVICE))
       return ip;
     iunlockput(ip);
     return 0;
@@ -427,7 +427,6 @@ sys_open(void)
             count++;
         }
         if (count >= 10) {
-            printf("We got a cycle!\n");
             iunlockput(ip);
             end_op();
             return -1;
